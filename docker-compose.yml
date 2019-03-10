@@ -5,6 +5,9 @@ services:
     ports:
       - 8080:8080
     working_dir: /go/src/slackbot-go
-    entrypoint: bash
+    entrypoint: go
+    command:
+      - run
+      - slackbot-go
     volumes:
       - ./:/go/src/slackbot-go
