@@ -1,0 +1,10 @@
+version: "2.3"
+services:
+  slackbot:
+    image: golang:stretch
+    ports:
+      - 8080:8080
+    working_dir: /go/src/slackbot-go
+    entrypoint: bash
+    volumes:
+      - ./:/go/src/slackbot-go
