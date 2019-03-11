@@ -29,7 +29,7 @@ func sayHello(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	http.HandleFunc("/", routeutil.GETRoute(sayHello))
-	http.HandleFunc("/echo", routeutil.POSTRoute(echoBody))
+	http.HandleFunc("/echo", routeutil.AuthenticatedPOSTRoute(echoBody))
 	log.Printf("Starting up")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

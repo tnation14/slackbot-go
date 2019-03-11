@@ -75,3 +75,19 @@ func POSTRoute(fn func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
             fn,
             validator).MakeHandler()
 }
+
+// Wraps a route in a function that checks username and password
+func AuthenticatedRoute(fn func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
+    // TODO Make this validator real
+    validator := func(r *http.Request) (bool, int) {
+                    log.Printf("[INFO]: Username or password incorrect.")
+                    return false, http.StatusForbidden
+                }
+    return newRoute(
+        fn,
+        validator).MakeHandler()
+}
+
+func AuthenticatedPOSTRoute (fn func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
+    return AuthenticatedRoute(GETRoute(fn))
+}
