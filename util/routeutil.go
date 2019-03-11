@@ -8,60 +8,33 @@ import (
     "log"
 )
 
-// A route binds a function to one or more HTTP methods.
+// A route wraps a HTTP handler in a validator function.
 type Route interface {
     MakeHandler() http.HandlerFunc
 
 }
 
-// A single-method endpoint only accepts one method.
-type singleMethodRoute struct {
-    method string
+type routeImpl struct {
+    validator func(*http.Request) (bool, int)
     handler func(http.ResponseWriter, *http.Request)
 }
 
-func newSingleRoute(method string, fn func(http.ResponseWriter, *http.Request)) Route {
-    return &singleMethodRoute {
-        method: method,
-        handler: fn}
+func newRoute(fn func(http.ResponseWriter, *http.Request), validator func(*http.Request) (bool, int)) Route {
+    return &routeImpl {
+        handler: fn,
+        validator: validator}
 }
 
 // Validates the request method before executing a function.
-func (smr *singleMethodRoute) MakeHandler() http.HandlerFunc {
+func (route *routeImpl) MakeHandler() http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != smr.method {
-            log.Printf("[ERROR]: HTTP method %s not supported", r.Method)
-            w.WriteHeader(http.StatusMethodNotAllowed)
-            return
-
-        }
-        smr.handler(w, r)
-    }
-}
-
-// A multi-method route supports multiple methods.
-type multiMethodRoute struct {
-    methods []string
-    handler func(http.ResponseWriter, *http.Request)
-}
-
-func newMultiRoute(methods []string, handler func(http.ResponseWriter, *http.Request)) Route {
-    return &multiMethodRoute{
-        methods: methods,
-        handler: handler}
-}
-
-// Validate request method against a list of acceptable methods
-func (mmr *multiMethodRoute) MakeHandler() http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        validMethod := inList(r.Method, mmr.methods)
-        if ! validMethod  {
-            log.Printf("[ERROR]: HTTP method %s not supported", r.Method)
-            w.WriteHeader(http.StatusMethodNotAllowed)
+        valid, errcode := route.validator(r)
+        if valid  {
+            route.handler(w, r)
+        } else {
+            w.WriteHeader(errcode)
             return
         }
-
-        mmr.handler(w, r)
     }
 }
 
@@ -77,10 +50,28 @@ func inList(val string, choices []string) bool {
 
 // Routes that only support HTTP GET
 func GETRoute(fn func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
-    return newSingleRoute(http.MethodGet, fn).MakeHandler()
+    validator := func(r *http.Request) (bool, int){
+                    if r.Method == http.MethodGet {
+                        return true, http.StatusOK
+                    }
+                    log.Printf("[ERROR] Method %s not allowed", r.Method)
+                    return false, http.StatusMethodNotAllowed
+                 }
+    return newRoute(
+            fn,
+            validator).MakeHandler()
 }
 
-// POST routes must support POST and OPTIONS (for CORS)
+
 func POSTRoute(fn func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
-    return newMultiRoute([]string{http.MethodPost, http.MethodOptions}, fn).MakeHandler()
+    validator := func(r *http.Request) (bool, int) {
+                    if !inList(r.Method, []string{http.MethodPost, http.MethodOptions}) {
+                        log.Printf("[ERROR]: Method %s not in %s.", r.Method, []string{http.MethodPost, http.MethodOptions})
+                        return false, http.StatusMethodNotAllowed
+                    }
+                        return true, http.StatusOK
+                }
+    return newRoute(
+            fn,
+            validator).MakeHandler()
 }
